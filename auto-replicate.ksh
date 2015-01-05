@@ -148,6 +148,8 @@ destfs=$destfsroot/`echo $sourcefs | cut -d/ -f2,3-`
 # snapshot management/deletion scripts.
 
 repllock="replication:locked:$RHOST"
+repllocklocal="replication:sendingto:$RHOST"
+repllockremote="replication:receivingfrom:$sourcefs"
 replconfirmed="replication:confirmed"
 
 # Define local and remote ZFS commands and SSH param
@@ -231,21 +233,22 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 			# Check the local and remote filesystems for locks from other jobs so we don't run
 			# into conflicts - especially useful when large transfers overflow the transfer window
 			# or when running cleanup actions on the destination filesystem
-			localfslocked=`$LZFS get -H $repllock $sourcefs | cut -f3`
-			remotefslocked=`$RZFS get -H $repllock $destfs | cut -f3`
+			localfslocked=`$LZFS get -H $repllocklocal $sourcefs | cut -f3`
+			remotefslocked=`$RZFS get -H $repllockremote $destfs | cut -f3`
 			
 			if [[ $localfslocked = "true" || $remotefslocked = "true" ]];then
 				echo "\nFilesystem locked, quitting..."
 				echo "$sourcefs is locked: $localfslocked\n$destfs is locked: $remotefslocked"
-				echo "\nSet $localfslocked to false to unlock the sending side"
-				echo "\nSet $remotefslocked to false to unlock the receiving side"				
+				echo "Check for a hung background send/recv task or:"
+				echo "	Set $repllocklocal to false to unlock the sending side"
+				echo "	Set $repllockremote to false to unlock the receiving side"				
 				echo "\nFilesystem locked" \
-				"\n$sourcefs is locked: $localfslocked" \
-				"\n$destfs is locked: $remotefslocked" \
+				"\n$sourcefs : $repllocklocal : $localfslocked" \
+				"\n$destfs : $repllockremote : $remotefslocked" \
 				| mailx -s "Failed access: $sourcefs" $contact;
 				exit 1;
 			  else
-				$LZFS set $repllock=true $sourcefs
+				$LZFS set $repllocklocal=true $sourcefs
 			fi
 			
 			# Get the most recent snapshot from the remote filesystem.
@@ -270,7 +273,7 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 			else
 				if [[ $localstartsnap = $locallastsnap ]];then
 					echo "No new snapshots to send - unlocking $sourcefs and exiting"
-					$LZFS set $repllock=false $sourcefs
+					$LZFS set $repllocklocal=false $sourcefs
 				else
 					# check if $localstartsnap $locallastsnap are the same - no point in sending
 					echo "The Source snapshot does exist on the Destination, ready to send updates!"
@@ -280,7 +283,7 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 					remotefinalsnap="$destfs@$lastsnapname"
 			
 					echo "Locking remote filesystem: $destfs"
-					$RZFS set $repllock=true $destfs
+					$RZFS set $repllockremote=true $destfs
 					echo "Command: $LZFS send -I $localstartsnap $locallastsnap | $RZFS recv $destfs"
 					$LZFS send -I $localstartsnap $locallastsnap | $RZFS recv -vF $destfs || \
 					{
@@ -289,16 +292,16 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 						"\nSource: $localstartsnap $locallastsnap" \
 						"\nDestination: $RHOST - $destfsroot" \
 						| mailx -s "Failed replication between: $localstartsnap and $locallastsnap" $contact;
-						$LZFS set $repllock=false $sourcefs
+						$LZFS set $repllockremote=false $sourcefs
 						exit 1;
 					}
 					  
 					# Reset all of the filesystem locks and status flags
 					$LZFS set $replconfirmed=true $locallastsnap
 					
-					$LZFS set $repllock=false $sourcefs
+					$LZFS set $repllocklocal=false $sourcefs
 					$RZFS set $replconfirmed=true $remotefinalsnap
-					$RZFS set $repllock=false $destfs
+					$RZFS set $repllockremote=false $destfs
 					#echo "$RZFS set $replconfirmed=true $remotefinalsnap"
 					#echo "$RZFS set $repllock=false $destfs"
 					echo "Releasing hold on $localstartsnap"
