@@ -1,5 +1,5 @@
 #!/bin/ksh -p
-# auto-replicate.ksh v0.98
+# auto-replicate.ksh v0.99
 #
 # ZFS snapshot replication script
 #
@@ -101,6 +101,11 @@
 #
 # 11 dec 2014 : EA : Added control for darwin as an OS type to setup the command shortcuts
 #						appropriate for use with ZFS on OS X 
+#
+#
+# 5 jan 2015 : EA : Minor corrections and inclusion of OS checks from the backup script.
+#						Added more explanation to the file system replication lock checking
+#						to make it clearer what needs to be done.
 
 ###############################################################################
 # In progress/to do
@@ -153,7 +158,7 @@ LZFS="pfexec /sbin/zfs"
 if [[ $RHOST = "localhost" ]]; then
 	RZFS="pfexec /sbin/zfs"
 else
-	RZFS="ssh root@$RHOST pfexec /sbin/zfs"
+	RZFS="ssh -C $RHOST zfs"
 fi
 
 ###############################################################################
@@ -166,6 +171,28 @@ WC="/usr/gnu/bin/wc"
 TAIL="/usr/gnu/bin/tail"
 TR="/usr/gnu/bin/tr"
 CUT="/usr/gnu/bin/cut"
+
+isnexenta=`uname -a | grep Nexenta -i | wc -l`
+if [[ $isnexenta -gt 0 ]];then
+	LZFS="/usr/sbin/zfs"
+	LZPOOL="/usr/sbin/zpool"
+	GREP="/usr/bin/grep"
+	WC="/usr/bin/wc"
+	TAIL="/usr/bin/tail"
+	TR="/usr/bin/tr"
+	CUT="/usr/bin/cut"	
+fi
+
+isindiana=`uname -a | grep oi_ -i | wc -l`
+if [[ $isindiana -gt 0 ]];then
+	LZFS="/usr/sbin/zfs"
+	LZPOOL="/usr/sbin/zpool"
+	GREP="/usr/bin/grep"
+	WC="/usr/bin/wc"
+	TAIL="/usr/bin/tail"
+	TR="/usr/bin/tr"
+	CUT="/usr/bin/cut"	
+fi
 
 isdarwin=`uname -a | grep darwin -i | wc -l`
 if [[ $isdarwin -gt 0 ]];then
@@ -181,18 +208,18 @@ fi
 ###############################################################################
 # Check for the existence of the source filesystem
 echo "Checking for $sourcefs"
-localfsnamecheck=`$LZFS list -o name | grep ^$sourcefs\$`
+localfsnamecheck=`$LZFS list -o name | $GREP ^$sourcefs\$`
 if [[ $localfsnamecheck = $sourcefs ]];then
 	echo "Source filesystem $sourcefs exists"
 
 	###############################################################################
 	# Check for the existence of the destination filesystem
 	echo "Checking for $destfs"
-	remotefsnamecheck=`$RZFS list -o name | grep ^$destfs\$`
+	remotefsnamecheck=`$RZFS list -o name | $GREP ^$destfs\$`
 	
 	# Get most recent local snapshot - used either as the baseline for a new transfer
 	# or as the last item of an incremental transfer.
-	locallastsnap=`$LZFS list -Hr -o name -s creation -t snapshot $sourcefs | tail -1`	
+	locallastsnap=`$LZFS list -Hr -o name -s creation -t snapshot $sourcefs | $TAIL -1`	
 	
 	if [[ $locallastsnap = "" ]]; then
 		echo "No local snapshot to use as replication baseline - exiting"
@@ -208,7 +235,10 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 			remotefslocked=`$RZFS get -H $repllock $destfs | cut -f3`
 			
 			if [[ $localfslocked = "true" || $remotefslocked = "true" ]];then
-				echo "\nFilesystem locked, quitting: $sourcefs"
+				echo "\nFilesystem locked, quitting..."
+				echo "$sourcefs is locked: $localfslocked\n$destfs is locked: $remotefslocked"
+				echo "\nSet $localfslocked to false to unlock the sending side"
+				echo "\nSet $remotefslocked to false to unlock the receiving side"				
 				echo "\nFilesystem locked" \
 				"\n$sourcefs is locked: $localfslocked" \
 				"\n$destfs is locked: $remotefslocked" \
@@ -219,11 +249,11 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 			fi
 			
 			# Get the most recent snapshot from the remote filesystem.
-			remotelastsnap=`$RZFS list -Hr -o name -s creation -t snapshot $destfs | tail -1 | cut -d/ -f2,3-`
+			remotelastsnap=`$RZFS list -Hr -o name -s creation -t snapshot $destfs | $TAIL -1 | $CUT -d/ -f2,3-`
 			echo "Most recent destination snapshot: $remotelastsnap"
 			
 			# Match the last remote snapshot with the local one.
-			localstartsnap=`$LZFS list -r -o name -s creation -t snapshot $sourcefs | grep $remotelastsnap\$`
+			localstartsnap=`$LZFS list -r -o name -s creation -t snapshot $sourcefs | $GREP $remotelastsnap\$`
 			echo "Matching source snapshot: $localstartsnap"
 			
 			remotelastsnap="$destfsroot/$remotelastsnap"
@@ -246,7 +276,7 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 					echo "The Source snapshot does exist on the Destination, ready to send updates!"
 					
 					
-					lastsnapname=`$LZFS list -Hr -o name -s creation -t snapshot $sourcefs | tail -1 | cut -d@ -f2`
+					lastsnapname=`$LZFS list -Hr -o name -s creation -t snapshot $sourcefs | $TAIL -1 | $CUT -d@ -f2`
 					remotefinalsnap="$destfs@$lastsnapname"
 			
 					echo "Locking remote filesystem: $destfs"
@@ -295,7 +325,7 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 
 	###############################################################################
 	# Maintenance tasks: checking for orphan and very old holds
-	snaplist=`zfs list -t snapshot -o name | grep $sourcefs`
+	snaplist=`zfs list -t snapshot -o name | $GREP $sourcefs`
 	
 	holdlist=""
 	for snapshot in ${snaplist[@]}
@@ -304,14 +334,14 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 		holdlist="${holdlist}\n$hold"
 	done
 	
-	holdcount=`echo -e $holdlist | grep $destfsroot | $WC -l`
+	holdcount=`echo -e $holdlist | $GREP $destfsroot | $WC -l`
 	
 	if [[ $holdcount -gt 1 ]];then
 		echo "Alert: possible orphan hold on a snapshot. There are more than one holds associated with $destfsroot"
-		echo -e $holdlist | grep $destfsroot
+		echo -e $holdlist | $GREP $destfsroot
 		
 		echo -e "Alert: possible orphan hold on a snapshot. There are more than one holds associated with $destfsroot"\
-				$holdlist | grep $destfsroot\
+				$holdlist | $GREP $destfsroot\
 				 | mailx -s "Possible orphan hold on $sourcefs" $contact;
 		
 	fi

@@ -80,7 +80,7 @@ TAIL="/usr/gnu/bin/tail"
 TR="/usr/gnu/bin/tr"
 CUT="/usr/gnu/bin/cut"
 
-isnexenta=`uname -a | grep Nexenta -i | wc -l`
+isnexenta=`uname -a | $GREP Nexenta -i | wc -l`
 if [[ $isnexenta -gt 0 ]];then
 	LZFS="/usr/sbin/zfs"
 	LZPOOL="/usr/sbin/zpool"
@@ -91,7 +91,7 @@ if [[ $isnexenta -gt 0 ]];then
 	CUT="/usr/bin/cut"	
 fi
 
-isindiana=`uname -a | grep oi_ -i | wc -l`
+isindiana=`uname -a | $GREP oi_ -i | wc -l`
 if [[ $isindiana -gt 0 ]];then
 	LZFS="/usr/sbin/zfs"
 	LZPOOL="/usr/sbin/zpool"
