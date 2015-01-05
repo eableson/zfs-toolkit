@@ -139,6 +139,7 @@ contact="root@localhost"
 
 # Create a dest fs variable derived from source fs
 destfs=$destfsroot/`echo $sourcefs | cut -d/ -f2,3-`
+LHOST=`hostname`
 
 # Establish a ZFS user property to store replication settings/locking
 # This gives you a mechanism for checking for conflicts on actions currently 
@@ -149,7 +150,7 @@ destfs=$destfsroot/`echo $sourcefs | cut -d/ -f2,3-`
 
 repllock="replication:locked:$RHOST"
 repllocklocal="replication:sendingto:$RHOST"
-repllockremote="replication:receivingfrom:$sourcefs"
+repllockremote="replication:receivingfrom:$LHOST"
 replconfirmed="replication:confirmed"
 
 # Define local and remote ZFS commands and SSH param
