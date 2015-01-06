@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-# auto-backup.sh v0.2
+# auto-backup.sh v0.3
 #
 # ZFS replication script optimized for local backups
 #
@@ -71,36 +71,23 @@ contact="root@localhost" # Contact e-mail address - don't forget to change this!
 
 ###############################################################################
 # Fixed path commands for cron launched jobs without $PATH
-# Defaults are for Solaris 11 environments
-LZFS="pfexec /sbin/zfs"
-LZPOOL="pfexec /sbin/zpool"
-GREP="/usr/gnu/bin/grep"
-WC="/usr/gnu/bin/wc"
-TAIL="/usr/gnu/bin/tail"
-TR="/usr/gnu/bin/tr"
-CUT="/usr/gnu/bin/cut"
 
-isnexenta=`uname -a | $GREP Nexenta -i | wc -l`
-if [[ $isnexenta -gt 0 ]];then
-	LZFS="/usr/sbin/zfs"
-	LZPOOL="/usr/sbin/zpool"
-	GREP="/usr/bin/grep"
-	WC="/usr/bin/wc"
-	TAIL="/usr/bin/tail"
-	TR="/usr/bin/tr"
-	CUT="/usr/bin/cut"	
+WHICH="/usr/bin/which"
+UNAME=`$WHICH uname`
+if [ `$UNAME` = "SunOS" ]; then
+	LZFS="pfexec "`$WHICH zfs`
+	LZPOOL="pfexec "`$WHICH zpool`
+else
+	LZFS=`$WHICH zfs`
+	LZPOOL=`$WHICH zpool`
 fi
+GREP=`$WHICH grep`
+WC=`$WHICH wc`
+TAIL=`$WHICH tail`
+TR=`$WHICH tr`
+CUT=`$WHICH cut`
+ECHO=`$WHICH echo`
 
-isindiana=`uname -a | $GREP oi_ -i | wc -l`
-if [[ $isindiana -gt 0 ]];then
-	LZFS="/usr/sbin/zfs"
-	LZPOOL="/usr/sbin/zpool"
-	GREP="/usr/bin/grep"
-	WC="/usr/bin/wc"
-	TAIL="/usr/bin/tail"
-	TR="/usr/bin/tr"
-	CUT="/usr/bin/cut"	
-fi
 
 ###############################################################################
 # Functions
@@ -117,7 +104,7 @@ EOT
 sendsnaps() {
 	echo "The Source snapshot does exist on the Destination, ready to send updates!"
 	
-	lastsnapname=`$LZFS list -H -o name -s creation -t snapshot | grep ^$sourcefs@ | tail -1 | $CUT -d@ -f2`
+	lastsnapname=`$LZFS list -H -o name -s creation -t snapshot | $GREP ^$sourcefs@ | $TAIL -1 | $CUT -d@ -f2`
 	destfinalsnap="$destfs@$lastsnapname"
 
 	echo "Command: $LZFS send -R -I $localstartsnap $locallastsnap | $LZFS recv -vF $destfs"

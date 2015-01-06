@@ -1,4 +1,4 @@
-#!/bin/ksh -p
+#!/bin/bash -p
 #
 # ZFS snapshot script
 #
@@ -26,51 +26,28 @@
 # 5 aug 2012 : EA : Included fixed path commands with check for Nexenta
 # 6 aug 2012 : EA : Included fixed path commands with check for Open Indiana
 # 8 dec 2014 : EA  : Added fixed path commands with check for OS X (Darwin) for use with OpenZFS
+# 6 jan 2015 : EA : Updated to a standard method for handling path selection when $PATH
+#						is missing or incomplete
+#					Switched to bash
 
 ###############################################################################
 # Fixed path commands for cron launched jobs without $PATH
-# Defaults are for Solaris 11 environments
-LZFS="pfexec /sbin/zfs"
-LZPOOL="pfexec /sbin/zpool"
-GREP="/usr/gnu/bin/grep"
-WC="/usr/gnu/bin/wc"
-TAIL="/usr/gnu/bin/tail"
-TR="/usr/gnu/bin/tr"
-CUT="/usr/gnu/bin/cut"
 
-isnexenta=`uname -a | grep Nexenta -i | wc -l`
-if [[ $isnexenta -gt 0 ]];then
-	LZFS="/usr/sbin/zfs"
-	LZPOOL="/usr/sbin/zpool"
-	GREP="/usr/bin/grep"
-	WC="/usr/bin/wc"
-	TAIL="/usr/bin/tail"
-	TR="/usr/bin/tr"
-	CUT="/usr/bin/cut"	
+WHICH="/usr/bin/which"
+UNAME=`$WHICH uname`
+if [ `$UNAME` = "SunOS" ]; then
+	LZFS="pfexec "`$WHICH zfs`
+	LZPOOL="pfexec "`$WHICH zpool`
+else
+	LZFS=`$WHICH zfs`
+	LZPOOL=`$WHICH zpool`
 fi
-
-isindiana=`uname -a | grep indiana -i | wc -l`
-if [[ $isindiana -gt 0 ]];then
-	LZFS="sudo /usr/sbin/zfs"
-	LZPOOL="sudo /usr/sbin/zpool"
-	GREP="/usr/gnu/bin/grep"
-	WC="/usr/gnu/bin/wc"
-	TAIL="/usr/gnu/bin/tail"
-	TR="/usr/gnu/bin/tr"
-	CUT="/usr/gnu/bin/cut"	
-fi
-
-isdarwin=`uname -a | grep darwin -i | wc -l`
-if [[ $isdarwin -gt 0 ]];then
-	LZFS="sudo /usr/sbin/zfs"
-	LZPOOL="sudo /usr/sbin/zpool"
-	GREP="/usr/bin/grep"
-	WC="/usr/bin/wc"
-	TAIL="/usr/bin/tail"
-	TR="/usr/bin/tr"
-	CUT="/usr/bin/cut"	
-fi
-
+GREP=`$WHICH grep`
+WC=`$WHICH wc`
+TAIL=`$WHICH tail`
+TR=`$WHICH tr`
+CUT=`$WHICH cut`
+ECHO=`$WHICH echo`
 
 sourcefs=$1             # source filesystem
 

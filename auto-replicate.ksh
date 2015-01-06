@@ -1,4 +1,4 @@
-#!/bin/ksh -p
+#!/bin/bash -p
 # auto-replicate.ksh v0.99
 #
 # ZFS snapshot replication script
@@ -106,6 +106,11 @@
 # 5 jan 2015 : EA : Minor corrections and inclusion of OS checks from the backup script.
 #						Added more explanation to the file system replication lock checking
 #						to make it clearer what needs to be done.
+#
+# 6 jan 2015 : EA : Replaced the fixed path check code with a more sensible solution.
+#						Validate correctly for different operating systems on the send and
+#						receive (include pfexec for SunOS based environments)
+#						force to bash as the shell
 
 ###############################################################################
 # In progress/to do
@@ -137,16 +142,37 @@ fi
 # Contact e-mail address - don't forget to change this!
 contact="root@localhost"
 
+###############################################################################
+# Fixed path commands for cron launched jobs without $PATH
+
+WHICH="/usr/bin/which"
+UNAME=`$WHICH uname`
+if [ `$UNAME` = "SunOS" ]; then
+	LZFS="pfexec "`$WHICH zfs`
+	LZPOOL="pfexec "`$WHICH zpool`
+else
+	LZFS=`$WHICH zfs`
+	LZPOOL=`$WHICH zpool`
+fi
+GREP=`$WHICH grep`
+WC=`$WHICH wc`
+TAIL=`$WHICH tail`
+TR=`$WHICH tr`
+CUT=`$WHICH cut`
+ECHO=`$WHICH echo`
+
 # Create a dest fs variable derived from source fs
-destfs=$destfsroot/`echo $sourcefs | cut -d/ -f2,3-`
+destfs=$destfsroot/`$ECHO $sourcefs | $CUT -d/ -f2,3-`
 LHOST=`hostname`
 
 # Establish a ZFS user property to store replication settings/locking
 # This gives you a mechanism for checking for conflicts on actions currently 
 # running. remote host has been added to the property so that you can have
 # multiple concurrent replication sessions to different destinations
-# Also adds a "dependency" field, so you can check for this value in your
-# snapshot management/deletion scripts.
+# The following is deprecated and replaced with zfs holds which prevent 
+# snapshot deletion 
+# - Also adds a "dependency" field, so you can check for this value in your
+# - snapshot management/deletion scripts.
 
 repllock="replication:locked:$RHOST"
 repllocklocal="replication:sendingto:$RHOST"
@@ -156,57 +182,18 @@ replconfirmed="replication:confirmed"
 # Define local and remote ZFS commands and SSH param
 # you can modify the ssh parameters to choose an encryption method that's
 # a little easier on the CPU if you want to.
-LZFS="pfexec /sbin/zfs"
 
 if [[ $RHOST = "localhost" ]]; then
-	RZFS="pfexec /sbin/zfs"
+	RZFS=$LZFS
 else
-	RZFS="ssh -C $RHOST zfs"
+	REMOTEOS=`ssh $RHOST uname`
+	if [ $REMOTEOS = "SunOS" ]; then
+		RZFS="ssh -C $RHOST pfexec zfs"
+	else
+		RZFS="ssh -C $RHOST zfs"
+	fi
 fi
 
-###############################################################################
-# Fixed path commands for cron launched jobs without $PATH
-# Defaults are for Solaris 11 environments
-LZFS="pfexec /sbin/zfs"
-LZPOOL="pfexec /sbin/zpool"
-GREP="/usr/gnu/bin/grep"
-WC="/usr/gnu/bin/wc"
-TAIL="/usr/gnu/bin/tail"
-TR="/usr/gnu/bin/tr"
-CUT="/usr/gnu/bin/cut"
-
-isnexenta=`uname -a | grep Nexenta -i | wc -l`
-if [[ $isnexenta -gt 0 ]];then
-	LZFS="/usr/sbin/zfs"
-	LZPOOL="/usr/sbin/zpool"
-	GREP="/usr/bin/grep"
-	WC="/usr/bin/wc"
-	TAIL="/usr/bin/tail"
-	TR="/usr/bin/tr"
-	CUT="/usr/bin/cut"	
-fi
-
-isindiana=`uname -a | grep oi_ -i | wc -l`
-if [[ $isindiana -gt 0 ]];then
-	LZFS="/usr/sbin/zfs"
-	LZPOOL="/usr/sbin/zpool"
-	GREP="/usr/bin/grep"
-	WC="/usr/bin/wc"
-	TAIL="/usr/bin/tail"
-	TR="/usr/bin/tr"
-	CUT="/usr/bin/cut"	
-fi
-
-isdarwin=`uname -a | grep darwin -i | wc -l`
-if [[ $isdarwin -gt 0 ]];then
-	LZFS="sudo /usr/sbin/zfs"
-	LZPOOL="sudo /usr/sbin/zpool"
-	GREP="/usr/bin/grep"
-	WC="/usr/bin/wc"
-	TAIL="/usr/bin/tail"
-	TR="/usr/bin/tr"
-	CUT="/usr/bin/cut"	
-fi
 
 ###############################################################################
 # Check for the existence of the source filesystem
@@ -238,8 +225,9 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 			remotefslocked=`$RZFS get -H $repllockremote $destfs | cut -f3`
 			
 			if [[ $localfslocked = "true" || $remotefslocked = "true" ]];then
-				echo "\nFilesystem locked, quitting..."
-				echo "$sourcefs is locked: $localfslocked\n$destfs is locked: $remotefslocked"
+				echo "Filesystem locked, quitting..."
+				echo "  $sourcefs is locked: $localfslocked"
+				echo "  $destfs is locked: $remotefslocked"
 				echo "Check for a hung background send/recv task or:"
 				echo "	Set $repllocklocal to false to unlock the sending side"
 				echo "	Set $repllockremote to false to unlock the receiving side"				

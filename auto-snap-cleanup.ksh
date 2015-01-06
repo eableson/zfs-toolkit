@@ -1,5 +1,5 @@
-#!/bin/ksh -p
-# auto-snap-cleanup.ksh v0.91
+#!/bin/bash -p
+# auto-snap-cleanup.ksh v0.92
 #
 # ZFS snapshot cleanup script - a companion to the auto-replicate script
 #
@@ -33,6 +33,8 @@
 #  5 aug 2012  : EA : Added fixed paths for Nexenta.
 #
 #  6 aug 2012  : EA : Included fixed path commands with check for Open Indiana
+#
+#  6 jan 2015  : EA : updated to standard path code for the set
 
 ###############################################################################
 # Grab commandline argument variables
@@ -59,46 +61,24 @@ fi
 
 
 ###############################################################################
-# Fixed path commands
+# Fixed path commands for cron launched jobs without $PATH
 
-LZFS="pfexec /sbin/zfs"
-WC="/usr/gnu/bin/wc"
-GREP="/usr/gnu/bin/grep"
-TAIL="/usr/gnu/bin/tail"
-PAUSE=10
-
-isnexenta=`uname -a | grep Nexenta -i | wc -l`
-if [[ $isnexenta -gt 0 ]];then
-	LZFS="/usr/sbin/zfs"
-	LZPOOL="/usr/sbin/zpool"
-	GREP="/usr/bin/grep"
-	WC="/usr/bin/wc"
-	TAIL="/usr/bin/tail"
-	TR="/usr/bin/tr"
-	CUT="/usr/bin/cut"	
+WHICH="/usr/bin/which"
+UNAME=`$WHICH uname`
+if [ `$UNAME` = "SunOS" ]; then
+	LZFS="pfexec "`$WHICH zfs`
+	LZPOOL="pfexec "`$WHICH zpool`
+else
+	LZFS=`$WHICH zfs`
+	LZPOOL=`$WHICH zpool`
 fi
+GREP=`$WHICH grep`
+WC=`$WHICH wc`
+TAIL=`$WHICH tail`
+TR=`$WHICH tr`
+CUT=`$WHICH cut`
+ECHO=`$WHICH echo`
 
-isindiana=`uname -a | grep indiana -i | wc -l`
-if [[ $isindiana -gt 0 ]];then
-	LZFS="/usr/sbin/zfs"
-	LZPOOL="/usr/sbin/zpool"
-	GREP="/usr/gnu/bin/grep"
-	WC="/usr/gnu/bin/wc"
-	TAIL="/usr/gnu/bin/tail"
-	TR="/usr/gnu/bin/tr"
-	CUT="/usr/gnu/bin/cut"	
-fi
-
-isdarwin=`uname -a | grep darwin -i | wc -l`
-if [[ $isdarwin -gt 0 ]];then
-	LZFS="sudo /usr/sbin/zfs"
-	LZPOOL="sudo /usr/sbin/zpool"
-	GREP="/usr/bin/grep"
-	WC="/usr/bin/wc"
-	TAIL="/usr/bin/tail"
-	TR="/usr/bin/tr"
-	CUT="/usr/bin/cut"	
-fi
 
 
 
