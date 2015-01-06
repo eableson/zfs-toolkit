@@ -78,7 +78,11 @@ TAIL=`$WHICH tail`
 TR=`$WHICH tr`
 CUT=`$WHICH cut`
 ECHO=`$WHICH echo`
-
+if [ `$UNAME` = "Darwin" ]; then
+	TAC="$TAIL -r"
+else
+	TAC=`$WHICH tac`
+fi
 
 
 
@@ -87,11 +91,11 @@ ECHO=`$WHICH echo`
 # Get filesystem list
 
 if [[ $fs = "" ]]; then
-	print "No filesystem specified, checking all"
+	echo "No filesystem specified, checking all"
 	fslist=`$LZFS list -Hr -o name | grep -v rpool | grep /`
 	echo "Found: $fslist"
 else
-	print "Checking $fs"
+	echo "Checking $fs"
 	localfsnamecheck=`$LZFS list -o name | grep ^$fs\$`
 	if [[ $localfsnamecheck = $fs ]];then
 		echo "Source filesystem $fs exists"
@@ -125,7 +129,7 @@ for thisfs in $fslist;do
 	###############################################################################
 	# Isolate the extra snaphots to be deleted, check for the dependency flag
 	if [[ $extrasnaps -gt 0 ]];then
-		snapstodelete=`$LZFS list -Hr -o name -s creation -t snapshot $thisfs | grep -v ^rpool | tac | tail -$extrasnaps | tac`
+		snapstodelete=`$LZFS list -Hr -o name -s creation -t snapshot $thisfs | $GREP -v ^rpool | $TAC | $TAIL -$extrasnaps | $TAC`
 		# the loop is to reverse the sort order so that the oldest are isolated by tail, and then reversed again so
 		# that deletion goes oldest to newest
 		
@@ -133,7 +137,7 @@ for thisfs in $fslist;do
 		   #if [[ `$LZFS get -Hr -o value replication:depend $thissnap` = "true" ]];then
 			#  print "$thissnap should not be deleted" 
 		   #else
-			  print "$thissnap will be deleted"
+			  echo "$thissnap will be deleted"
 			  $LZFS destroy $thissnap
 		   #fi
 		done

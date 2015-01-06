@@ -317,12 +317,12 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 
 	###############################################################################
 	# Maintenance tasks: checking for orphan and very old holds
-	snaplist=`zfs list -t snapshot -o name | $GREP $sourcefs`
+	snaplist=`$LZFS list -t snapshot -o name | $GREP $sourcefs`
 	
 	holdlist=""
 	for snapshot in ${snaplist[@]}
 	do : 
-		hold=`zfs holds $snapshot`
+		hold=`$LZFS holds $snapshot`
 		holdlist="${holdlist}\n$hold"
 	done
 	
