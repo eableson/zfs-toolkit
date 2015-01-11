@@ -175,8 +175,8 @@ LHOST=`hostname`
 # - snapshot management/deletion scripts.
 
 repllock="replication:locked:$RHOST"
-repllocklocal="replication:sendingto:$RHOST"
-repllockremote="replication:receivingfrom:$LHOST"
+repllocklocal="replication:sendingto:$RHOST:$destfs"
+repllockremote="replication:receivingfrom:$LHOST:$sourcefs"
 replconfirmed="replication:confirmed"
 
 # Define local and remote ZFS commands and SSH param
