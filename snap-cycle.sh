@@ -10,16 +10,20 @@
 # Obviously, this is *NOT* a backup all by itself, but can be exploited by using send/recv
 # to another environment to work as a backup locally, assuming your production storage is
 # available, and still have a second (or third, or n) copy with the same or similar history
-# on a physically separate storage system.
+# on physically separate storage systems.
 #
-# The snaps retention policy can be different by site, so that on external copy can be
+# The snaps retention policy can be different by site, so that an external copy can be
 # used for something closer to an archive with a longer retention period that the primary
 # storage system
 
 ###############################################################################
 # Usage 
 # The script is designed to be called once per day in a cron job so the snapshot
-# naming convention is by date 
+# naming convention is by date with the "sc-daily", "sc-weekly" or "sc-monthly" suffix to 
+# aid in identifying the source visually and for identifying newly transferred snapshots 
+# on a backup system where we will need to pose the holds in accordance with the local
+# policy
+# 
 # It takes 4 arguments in the following format and order :
 # - filesystem : tank/mydata
 # - (master|copy) : denotes whether this is running on the master copy and snapshots
@@ -31,9 +35,32 @@
 # The structure of including the letter prefixes is to remove any ambiguity when
 # running the script or looking at the options selected
 
+# Sample scenario
+# Primary storage bay has snap-cycle running once per day via a cron job
+# A separate cycle handles hourly snapshots. Hourly snapshots are used to provide local 
+# granularity for recovering files, but also so that when transferring data to the 
+# Secondary disaster recovery system over a relatively small link, an interruption will
+# not force the restart of the transmission from the previous day, but only an hourly
+# increment.
+# On the primary system the following policy is applied:
+# d10 w1 m1
+#
+# This ensures that weekly and monthly snapshots are taken on the primary system. On the 
+# secondary system the copy flag is used so that it will not create any snapshots, but 
+# simply pose the holds on the replicated snapshots:
+# d30 w8 m12
+# 
+# so that using slower larger disks, we can retain 30 days of daily snapshots, 8 weeks
+# and a year's worth of monthly snapshots.
+#
+# Since the source system is sending hourly snapshots, we need to get rid of these, so I
+# would use the auto-snap-cleanup script with a maximum set to more than the number of
+# anticipated snapshots for the retention policy. Since they will have holds, they will
+# never be deleted by the auto-snap-cleanup script.
+#
 
 #
-# 09 dec 2015 - EA - Initial version
+# 09 jan 2015 - EA - Initial version
 ###############################################################################
 # Fixed path commands for cron launched jobs without $PATH
 
@@ -52,6 +79,11 @@ TAIL=`$WHICH tail`
 TR=`$WHICH tr`
 CUT=`$WHICH cut`
 ECHO=`$WHICH echo`
+if [ `$UNAME` = "Darwin" ]; then
+	TAC="$TAIL -r"
+else
+	TAC=`$WHICH tac`
+fi
 
 ###############################################################################
 # Grab commandline argument variables
@@ -106,6 +138,11 @@ else
 	exit 1
 fi
 
+echo ""
+echo "#################################################################"
+echo "### Starting check of $sourcefs: " `date +%Y-%m-%d_%H-%M-%S` "###"
+
+
 
 # Check for existence of the requested filesystem
 localfsnamecheck=`$LZFS list -o name | $GREP ^$sourcefs\$`
@@ -122,27 +159,98 @@ NOW=`date +%Y-%m-%d`
 DAYSNAP=`date +%Y-%m-%d`"_sc-daily"
 WEEKSNAP=`date +%Y-%m-%d`"_sc-weekly"
 MONTHSNAP=`date +%Y-%m-%d`"_sc-monthly"
+SNAPSHOTTYPES=( "daily" "weekly" "monthly" )
 
 if [ $fstype = "master" ]; then
-	$LZFS snapshot $sourcefs@$DAYSNAP
-	echo "  $LZFS snapshot $sourcefs@$DAYSNAP"
-	$LZFS hold sc-daily $sourcefs@$DAYSNAP
+	echo "Creating snapshots on master filesystem"
+	if [[ `$LZFS list -t snapshot -o name -r $sourcefs | grep $DAYSNAP | wc -l` -gt 0 ]]; then
+		echo "  Daily snapshot $sourcefs@$DAYSNAP already exists. No action necessary"
+	else
+		echo "  Creating daily snapshot: $LZFS snapshot $sourcefs@$DAYSNAP"
+		$LZFS snapshot $sourcefs@$DAYSNAP
+		$LZFS hold sc-daily $sourcefs@$DAYSNAP
+	fi
 	# If weekday=7, set weekly hold
 	if [ `date +%u` -eq 7 ]; then
 		# It's sunday, so take a snapshot
-		$LZFS snapshot $sourcefs@$WEEKSNAP
-		echo "  $LZFS snapshot $sourcefs@$WEEKSNAP"
-	
+		if [[ `$LZFS list -t snapshot -o name -r $sourcefs | grep $WEEKSNAP | wc -l` -gt 0 ]]; then
+			echo "  Weekly snapshot $sourcefs@$WEEKSNAP already exists. No action necessary"
+		else
+			echo "  Creating weekly snapshot:$LZFS snapshot $sourcefs@$WEEKSNAP"
+			$LZFS snapshot $sourcefs@$WEEKSNAP
+			$LZFS hold sc-weekly $sourcefs@$WEEKSNAP	
+		fi
 	fi
 	# If monthday=1, set monthly hold
 	if [ `date +%d` -eq 1 ]; then
-		$LZFS snapshot $sourcefs@$MONTHSNAP
-		echo "  $LZFS snapshot $sourcefs@$MONTHSNAP"
+		if [[ `$LZFS list -t snapshot -o name -r $sourcefs | grep $MONTHSNAP | wc -l` -gt 0 ]]; then
+			echo "  Weekly snapshot $sourcefs@$MONTHSNAP already exists. No action necessary"
+		else
+			echo "  Creating monthly snapshot:$LZFS snapshot $sourcefs@$MONTHSNAP"
+			$LZFS snapshot $sourcefs@$MONTHSNAP
+			$LZFS hold sc-monthly $sourcefs@$MONTHSNAP
+		fi
 	fi
 fi
 
+######### Copy filesystem creates the holds only ############
+if [ $fstype = "copy" ]; then
+	
+	# First, add holds to newly received snapshots
+	for thissnaptype in ${SNAPSHOTTYPES[@]}; do
+		echo "Checking for new $thissnaptype snapshots to retain"
+		SNAPSTOCHECK=`$LZFS list -t snapshot -o name -r $sourcefs | grep sc-$thissnaptype\$`
+		# echo "$LZFS list -t snapshot -o name -r $sourcefs | grep sc-$thissnaptype\$"
+		for THISSNAP in	$SNAPSTOCHECK;do
+			scregex=sc-$thissnaptype
+			#echo $scregex
+			holdlist=`$LZFS holds $THISSNAP`
+			# echo $holdlist
+			#echo ""
+			if [[ $holdlist =~ $scregex ]]; then
+				echo "  snap $THISSNAP already has hold"
+			else
+				$LZFS hold sc-$thissnaptype $THISSNAP
+				echo "  applying hold to $THISSNAP"
+			fi
+		done
+	done
+fi
 
+# now in both cases we will clear the extra holds and delete the associated snapshots
 
+for thissnaptype in ${SNAPSHOTTYPES[@]}; do
+	echo "Purging expired $thissnaptype snapshots."
+	declare -i currentsnapcount
+	snapstocount=$thissnaptype"count"
+	snapstokeep=${!snapstocount}
+	# echo $snapstokeep
+	scregex=sc-$thissnaptype
+	currentsnapcount=`$LZFS list -Hr -o name -s creation -t snapshot $sourcefs | grep $scregex | $WC -l`
+	# echo "$LZFS list -Hr -o name -s creation -t snapshot $sourcefs | grep $scregex | $WC -l"
+	extrasnaps=$(($currentsnapcount-$snapstokeep))
+	if [ $extrasnaps -lt 0 ]; then
+		extrasnaps=0;
+	fi
+	echo "  Found $currentsnapcount snapshots.  $extrasnaps $thissnaptype snapshot(s) over the retention policy of $snapstokeep."
+		if [[ $extrasnaps -gt 0 ]];then
+		snapstodelete=`$LZFS list -Hr -o name -s creation -t snapshot $sourcefs | $TAC | $TAIL -$extrasnaps | $TAC`
+		# the loop is to reverse the sort order so that the oldest are isolated by tail, and then reversed again so
+		# that deletion goes oldest to newest
+		
+		for thissnap in $snapstodelete;do
+			  echo "  $thissnap will be deleted"
+			  $LZFS release $scregex $thissnap
+			  $LZFS destroy $thissnap
+		   #fi
+		done
+	else
+		echo "  No snaps to delete"
+	fi
+done
+echo "### Finished checking $sourcefs: " `date +%Y-%m-%d_%H-%M-%S` "###"
+echo "#################################################################"
+echo ""
 
 exit
 
