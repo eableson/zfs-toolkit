@@ -37,9 +37,9 @@
 
 # Sample scenario
 # Primary storage bay has snap-cycle running once per day via a cron job
-# A separate cycle handles hourly snapshots. Hourly snapshots are used to provide local 
+# A separate job handles hourly snapshots. Hourly snapshots are used to provide local 
 # granularity for recovering files, but also so that when transferring data to the 
-# Secondary disaster recovery system over a relatively small link, an interruption will
+# secondary disaster recovery system over a relatively small link, an interruption will
 # not force the restart of the transmission from the previous day, but only an hourly
 # increment.
 # On the primary system the following policy is applied:
@@ -195,12 +195,12 @@ fi
 
 ######### Copy filesystem creates the holds only ############
 if [ $fstype = "copy" ]; then
-	
+	echo "Controlling snapshots on a copy"
 	# First, add holds to newly received snapshots
 	for thissnaptype in ${SNAPSHOTTYPES[@]}; do
 		echo "Checking for new $thissnaptype snapshots to retain"
-		SNAPSTOCHECK=`$LZFS list -t snapshot -o name -r $sourcefs | grep sc-$thissnaptype\$`
-		# echo "$LZFS list -t snapshot -o name -r $sourcefs | grep sc-$thissnaptype\$"
+		SNAPSTOCHECK=`$LZFS list -t snapshot -o name -r $sourcefs | $GREP sc-$thissnaptype\$`
+		# echo "$LZFS list -t snapshot -o name -r $sourcefs | $GREP sc-$thissnaptype\$"
 		for THISSNAP in	$SNAPSTOCHECK;do
 			scregex=sc-$thissnaptype
 			#echo $scregex

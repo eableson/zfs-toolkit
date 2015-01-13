@@ -163,6 +163,7 @@ ECHO=`$WHICH echo`
 
 # Create a dest fs variable derived from source fs
 destfs=$destfsroot/`$ECHO $sourcefs | $CUT -d/ -f2,3-`
+srcpool=`$ECHO $sourcefs | $CUT -d/ -f1`
 LHOST=`hostname`
 
 # Establish a ZFS user property to store replication settings/locking
@@ -175,8 +176,8 @@ LHOST=`hostname`
 # - snapshot management/deletion scripts.
 
 repllock="replication:locked:$RHOST"
-repllocklocal="replication:sendingto:$RHOST:$destfs"
-repllockremote="replication:receivingfrom:$LHOST:$sourcefs"
+repllocklocal="replication:sendingto:$RHOST:$destfsroot"
+repllockremote="replication:receivingfrom:$LHOST:$srcpool"
 replconfirmed="replication:confirmed"
 
 # Define local and remote ZFS commands and SSH param
@@ -289,7 +290,7 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 					$LZFS set $replconfirmed=true $locallastsnap
 					
 					$LZFS set $repllocklocal=false $sourcefs
-					$RZFS set $replconfirmed=true $remotefinalsnap
+					#$RZFS set $replconfirmed=true $remotefinalsnap
 					$RZFS set $repllockremote=false $destfs
 					#echo "$RZFS set $replconfirmed=true $remotefinalsnap"
 					#echo "$RZFS set $repllock=false $destfs"
