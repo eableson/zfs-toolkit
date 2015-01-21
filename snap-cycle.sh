@@ -234,7 +234,7 @@ for thissnaptype in ${SNAPSHOTTYPES[@]}; do
 	fi
 	echo "  Found $currentsnapcount snapshots.  $extrasnaps $thissnaptype snapshot(s) over the retention policy of $snapstokeep."
 		if [[ $extrasnaps -gt 0 ]];then
-		snapstodelete=`$LZFS list -Hr -o name -s creation -t snapshot $sourcefs | $TAC | $TAIL -$extrasnaps | $TAC`
+		snapstodelete=`$LZFS list -Hr -o name -s creation -t snapshot $sourcefs | grep $scregex | $TAC | $TAIL -$extrasnaps | $TAC`
 		# the loop is to reverse the sort order so that the oldest are isolated by tail, and then reversed again so
 		# that deletion goes oldest to newest
 		
