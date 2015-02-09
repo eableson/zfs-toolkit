@@ -323,7 +323,7 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 	holdlist=""
 	for snapshot in ${snaplist[@]}
 	do : 
-		hold=`$LZFS holds $snapshot`
+		hold=`$LZFS holds $snapshot | grep -v .send`
 		holdlist="${holdlist}\n$hold"
 	done
 	
