@@ -79,10 +79,9 @@ TAIL=`$WHICH tail`
 TR=`$WHICH tr`
 CUT=`$WHICH cut`
 ECHO=`$WHICH echo`
-if [ `$UNAME` = "Darwin" ]; then
+TAC=`$WHICH tac`
+if [ "$TAC" == "" ]; then
 	TAC="$TAIL -r"
-else
-	TAC=`$WHICH tac`
 fi
 
 ###############################################################################
@@ -235,8 +234,8 @@ for thissnaptype in ${SNAPSHOTTYPES[@]}; do
 	echo "  Found $currentsnapcount snapshots.  $extrasnaps $thissnaptype snapshot(s) over the retention policy of $snapstokeep."
 	if [ $extrasnaps -gt 0 ];then
 		snapstodelete=`$LZFS list -Hr -o name -s creation -t snapshot $sourcefs | grep $scregex | $TAC | $TAIL -$extrasnaps | $TAC`
-		echo "$LZFS list -Hr -o name -s creation -t snapshot $sourcefs | grep $scregex | $TAC | $TAIL -$extrasnaps | $TAC"
-		echo $snapstodelete
+		#echo "$LZFS list -Hr -o name -s creation -t snapshot $sourcefs | grep $scregex | $TAC | $TAIL -$extrasnaps | $TAC"
+		#echo $snapstodelete
 		# the loop is to reverse the sort order so that the oldest are isolated by tail, and then reversed again so
 		# that deletion goes oldest to newest
 	
