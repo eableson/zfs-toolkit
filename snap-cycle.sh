@@ -233,7 +233,7 @@ for thissnaptype in ${SNAPSHOTTYPES[@]}; do
 		extrasnaps=0;
 	fi
 	echo "  Found $currentsnapcount snapshots.  $extrasnaps $thissnaptype snapshot(s) over the retention policy of $snapstokeep."
-	if [[ $extrasnaps -gt 0 ]];then
+	if [ $extrasnaps -gt 0 ];then
 		snapstodelete=`$LZFS list -Hr -o name -s creation -t snapshot $sourcefs | grep $scregex | $TAC | $TAIL -$extrasnaps | $TAC`
 		echo "$LZFS list -Hr -o name -s creation -t snapshot $sourcefs | grep $scregex | $TAC | $TAIL -$extrasnaps | $TAC"
 		echo $snapstodelete
