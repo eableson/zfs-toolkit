@@ -155,7 +155,7 @@ cleansnaps() {
 		# and then reversed again so that deletion goes oldest to newest
 		
 		for thissnap in $snapstodelete;do
-			  print "$thissnap will be deleted"
+			  echo "$thissnap will be deleted"
 			  $LZFS destroy -r $thissnap # -r to handle subordinate filesystems
 		done
 	else
