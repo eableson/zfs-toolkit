@@ -78,10 +78,9 @@ TAIL=`$WHICH tail`
 TR=`$WHICH tr`
 CUT=`$WHICH cut`
 ECHO=`$WHICH echo`
-if [ `$UNAME` = "Darwin" ]; then
+TAC=`$WHICH tac`
+if [ "$TAC" == "" ]; then
 	TAC="$TAIL -r"
-else
-	TAC=`$WHICH tac`
 fi
 
 
@@ -130,8 +129,11 @@ for thisfs in $fslist;do
 
 	###############################################################################
 	# Isolate the extra snaphots to be deleted, check for the dependency flag
+	# _sc traps on snap-cycle snapshots which are managed by the snapcycle routine
+	# This filter should also get rid of the dataset busy stuff that goes to stderr and
+	# pollutes the mail reporting via cron
 	if [[ $extrasnaps -gt 0 ]];then
-		snapstodelete=`$LZFS list -Hr -o name -s creation -t snapshot $thisfs | $GREP -v ^rpool | $TAC | $TAIL -$extrasnaps | $TAC`
+		snapstodelete=`$LZFS list -Hr -o name -s creation -t snapshot -r $thisfs | $GREP -v _sc | $TAC | $TAIL -$extrasnaps | $TAC`
 		# the loop is to reverse the sort order so that the oldest are isolated by tail, and then reversed again so
 		# that deletion goes oldest to newest
 		
