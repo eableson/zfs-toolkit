@@ -110,18 +110,10 @@ for thisfs in $fslist;do
 
 	###############################################################################
 	# Check source pool state
-#	No longer necessary - ZFS handles busy states OK and with the holds, won't delete and
-#	dependent snapshots
-#	
-#	islocked=`$LZFS get -Hr -o value replication:locked $thisfs | $TAIL -1`
-#	until [[ $islocked = "false" ]];do
-#		echo "Filesystem $thisfs is currently locked for replication - check status of current replication jobs and clear lock if necessary (zfs set replication:locked=false $thisfs)"
-#		exit 1
-#		sleep $PAUSE
-#		islocked=`$LZFS get -Hr -o value replication:locked $thisfs | $TAIL -1`
-#	done
-	
-	currentsnapcount=`$LZFS list -Hr -o name -s creation -t snapshot $thisfs | $WC -l`
+	# filtering on snap-cycle snapshots to only be working with volatile stuff, usually
+	# hourly or otherwise frequent snapshots that can then be mapped to a specific retention
+	# cycle. 24 hourly = 1 day, etc.
+	currentsnapcount=`$LZFS list -Hr -o name -s creation -t snapshot -r $thisfs | $GREP -v _sc | $WC -l`
 	extrasnaps=$(($currentsnapcount-$snapstokeep))
 	
 	echo "Number of extra snapshots to be deleted: $extrasnaps"
