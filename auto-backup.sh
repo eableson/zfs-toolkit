@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 # auto-backup.sh v0.3
 #
 # ZFS replication script optimized for local backups
