@@ -230,8 +230,8 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 				echo "  $sourcefs is locked: $localfslocked"
 				echo "  $destfs is locked: $remotefslocked"
 				echo "Check for a hung background send/recv task or:"
-				echo "	Set $repllocklocal to false to unlock the sending side"
-				echo "	Set $repllockremote to false to unlock the receiving side"				
+				echo "	Set $repllocklocal to false to unlock the sending side (zfs set $repllocklocal=false $sourcefs)"
+				echo "	Set $repllockremote to false to unlock the receiving side (zfs set $repllockremote=false $destfs)"
 				echo "\nFilesystem locked" \
 				"\n$sourcefs : $repllocklocal : $localfslocked" \
 				"\n$destfs : $repllockremote : $remotefslocked" \
@@ -323,7 +323,7 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 	holdlist=""
 	for snapshot in ${snaplist[@]}
 	do : 
-		hold=`$LZFS holds $snapshot | grep -v .send`
+		hold=`$LZFS holds $snapshot | $GREP -v .send | $GREP $destfsroot`
 		holdlist="${holdlist}\n$hold"
 	done
 	

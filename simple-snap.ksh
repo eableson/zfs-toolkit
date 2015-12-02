@@ -29,6 +29,10 @@
 # 6 jan 2015 : EA : Updated to a standard method for handling path selection when $PATH
 #						is missing or incomplete
 #					Switched to bash
+# 2 dec 2015 : EA : fixed a problem where searches for filessytems were open-ended and would
+#					find multiple filesystems that started with the same name
+#					ie pool/data01 and pool/data01local would both be snapshotted if the
+#					first one was selected
 
 ###############################################################################
 # Fixed path commands for cron launched jobs without $PATH
@@ -54,7 +58,7 @@ sourcefs=$1             # source filesystem
 NOW=`date +%Y-%m-%d_%H-%M-%S`
 
 if [ $sourcefs ]; then
-        fslist=`$LZFS list -Hr -o name | $GREP -v rpool | $GREP -v syspool | $GREP / | $GREP ^$sourcefs`
+        fslist=`$LZFS list -Hr -o name | $GREP -v rpool | $GREP -v syspool | $GREP / | $GREP ^$sourcefs$`
 
 else
         fslist=`$LZFS list -Hr -o name | $GREP -v rpool | $GREP -v syspool | $GREP /`
