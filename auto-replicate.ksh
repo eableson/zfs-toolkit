@@ -111,6 +111,11 @@
 #						Validate correctly for different operating systems on the send and
 #						receive (include pfexec for SunOS based environments)
 #						force to bash as the shell
+# 22 aug 2018 : EA : Added a check for ssh connectivity to the remote host and bailing early
+#						if this is the case. Also changed the default ssh connection to not
+#						use the -C (compression) option since the performance difference is
+#						not important and it chews up CPU for little gain
+
 
 ###############################################################################
 # In progress/to do
@@ -187,11 +192,20 @@ replconfirmed="replication:confirmed"
 if [[ $RHOST = "localhost" ]]; then
 	RZFS=$LZFS
 else
+	###############################################################################
+	# Check for connectivity to the remote host
+	echo "Checking for connectivity to $RHOST"
+	ssh -q $RHOST exit
+	if [[ $? > 0 ]]; then
+		echo "failed to connect to remote host"
+		exit 1
+	fi
+
 	REMOTEOS=`ssh $RHOST uname`
 	if [ $REMOTEOS = "SunOS" ]; then
-		RZFS="ssh -C $RHOST pfexec zfs"
+		RZFS="ssh $RHOST pfexec zfs"
 	else
-		RZFS="ssh -C $RHOST zfs"
+		RZFS="ssh $RHOST zfs"
 	fi
 fi
 
