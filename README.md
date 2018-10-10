@@ -8,7 +8,7 @@ A collection of tools for my day to day work with zfs servers:
 - auto-snap-cleanup.ksh
 - simple-snap.ksh
 
-For more details, with pictures check out http://blog.infrageeks.com/projects/
+For more details, with pictures check out https://www.infrageeks.com/projects
 
 ## auto-backup.sh ##
 
