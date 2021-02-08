@@ -288,8 +288,8 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 			
 					echo "Locking remote filesystem: $destfs"
 					$RZFS set $repllockremote=true $destfs
-					echo "Command: $LZFS send -I $localstartsnap $locallastsnap | $RZFS recv $destfs"
-					$LZFS send -I $localstartsnap $locallastsnap | $RZFS recv -vF $destfs || \
+					echo "Command: $LZFS send -I $localstartsnap $locallastsnap | $RZFS receive $destfs"
+					$LZFS send -I $localstartsnap $locallastsnap | $RZFS receive -vF $destfs || \
 					{
 						echo "Error when zfs send/receiving.";
 						echo "Failed snapshot replication" \
@@ -318,8 +318,8 @@ if [[ $localfsnamecheck = $sourcefs ]];then
 		else
 			echo "Destination filesystem $destfs does not exist - must create"
 			echo "Creating remote filesystem based on: $locallastsnap"
-			echo "$LZFS send $locallastsnap | $RZFS recv $destfs"
-			$LZFS send $locallastsnap | $RZFS recv $destfs
+			echo "$LZFS send $locallastsnap | $RZFS receive $destfs"
+			$LZFS send $locallastsnap | $RZFS receive $destfs
 			echo "Setting hold on $locallastsnap"
 			`$LZFS hold $destfsroot $locallastsnap`
 			echo "Setting $destfs to read only"
